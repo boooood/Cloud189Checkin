@@ -26,51 +26,13 @@ const accounts = require("../accounts");
 
 const mask = (s, start, end) => s.split("").fill("*", start, end).join("");
 
-const buildTaskResult = (res, result) => {
-  const index = result.length;
-  if (res.errorCode === "User_Not_Chance") {
-    result.push(`第${index}次抽奖失败,次数不足`);
-  } else {
-    result.push(`第${index}次抽奖成功,抽奖获得${res.prizeName}`);
-  }
-};
-
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// 任务 1.签到 2.天天抽红包 3.自动备份抽红包
+// 任务：个人签到（天翼云已下线抽奖和家庭签到，cloud189-sdk 1.0.9 起已移除相关接口）
 const doTask = async (cloudClient) => {
   const result = [];
   const res1 = await cloudClient.userSign();
   result.push(
-    `${res1.isSign ? "已经签到过了，" : ""}签到获得${res1.netdiskBonus}M空间`
+    `${res1.isSign ? "已经签到过了，" : ""}签到获得${res1.isSign ? 0 : res1.netdiskBonus}M空间`
   );
-  await delay(5000); // 延迟5秒
-
-  const res2 = await cloudClient.taskSign();
-  buildTaskResult(res2, result);
-
-  await delay(5000); // 延迟5秒
-  const res3 = await cloudClient.taskPhoto();
-  buildTaskResult(res3, result);
-
-  return result;
-};
-
-const doFamilyTask = async (cloudClient) => {
-  const { familyInfoResp } = await cloudClient.getFamilyList();
-  const result = [];
-  if (familyInfoResp) {
-    for (let index = 0; index < familyInfoResp.length; index += 1) {
-      const { familyId } = familyInfoResp[index];
-      const res = await cloudClient.familyUserSign(familyId);
-      result.push(
-        "家庭任务" +
-          `${res.signStatus ? "已经签到过了，" : ""}签到获得${
-            res.bonusSpace
-          }M空间`
-      );
-    }
-  }
   return result;
 };
 
@@ -200,12 +162,9 @@ async function main() {
       const userNameInfo = mask(userName, 3, 7);
       try {
         logger.log(`账户 ${userNameInfo}开始执行`);
-        const cloudClient = new CloudClient(userName, password);
-        await cloudClient.login();
+        const cloudClient = new CloudClient({ username: userName, password });
         const result = await doTask(cloudClient);
         result.forEach((r) => logger.log(r));
-        const familyResult = await doFamilyTask(cloudClient);
-        familyResult.forEach((r) => logger.log(r));
         logger.log("任务执行完毕");
         const { cloudCapacityInfo, familyCapacityInfo } =
           await cloudClient.getUserSizeInfo();
